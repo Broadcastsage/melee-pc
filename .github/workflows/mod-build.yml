@@ -9,6 +9,7 @@ on:
     paths:
       - '.github/workflows/mod-build.yml'
       - '.github/workflows/secret-characters.patch'
+      - '.github/workflows/secret-characters-fix1.patch'
   workflow_dispatch:
 
 permissions:
@@ -26,8 +27,10 @@ jobs:
       - name: Apply the mod
         run: |
           cp .github/workflows/secret-characters.patch "$RUNNER_TEMP/mod.patch"
+          cp .github/workflows/secret-characters-fix1.patch "$RUNNER_TEMP/fix1.patch"
           git checkout --detach 0fb0af3304d3469308b5574369a6ec86f145632f
           git apply --whitespace=nowarn "$RUNNER_TEMP/mod.patch"
+          git apply --whitespace=nowarn "$RUNNER_TEMP/fix1.patch"
           git status --short
 
       - name: Install build tools
