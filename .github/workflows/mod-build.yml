@@ -2,18 +2,19 @@ name: Modded Windows build (secret characters)
 
 # Builds melee-pc for Windows x86-64 with the secret-characters mod applied
 # (Master Hand, Crazy Hand, Giga Bowser, the Wireframes and Sandbag on the
-# VS character select screen). The patch was written against upstream
-# commit 0fb0af3, so it is applied there.
+# VS character select screen). The patches were written against upstream
+# commit 0fb0af3, so they are applied there: secret-characters.patch first,
+# then secret-characters-fixN.patch in order. The finished melee.exe is also
+# published as the "latest-mod" release so it can be fetched directly.
 on:
   push:
     paths:
       - '.github/workflows/mod-build.yml'
-      - '.github/workflows/secret-characters.patch'
-      - '.github/workflows/secret-characters-fix1.patch'
+      - '.github/workflows/*.patch'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows:
@@ -26,11 +27,14 @@ jobs:
 
       - name: Apply the mod
         run: |
-          cp .github/workflows/secret-characters.patch "$RUNNER_TEMP/mod.patch"
-          cp .github/workflows/secret-characters-fix1.patch "$RUNNER_TEMP/fix1.patch"
+          mkdir -p "$RUNNER_TEMP/patches"
+          cp .github/workflows/*.patch "$RUNNER_TEMP/patches/"
           git checkout --detach 0fb0af3304d3469308b5574369a6ec86f145632f
-          git apply --whitespace=nowarn "$RUNNER_TEMP/mod.patch"
-          git apply --whitespace=nowarn "$RUNNER_TEMP/fix1.patch"
+          git apply --whitespace=nowarn "$RUNNER_TEMP/patches/secret-characters.patch"
+          for p in $(ls "$RUNNER_TEMP"/patches/secret-characters-fix*.patch | sort -V); do
+            echo "applying $p"
+            git apply --whitespace=nowarn "$p"
+          done
           git status --short
 
       - name: Install build tools
@@ -51,3 +55,12 @@ jobs:
           name: Melee-Windows-x86_64-modded
           path: dist/Melee-Windows-x86_64.zip
           if-no-files-found: error
+
+      - name: Publish melee.exe for direct download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-mod --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create latest-mod build-win/melee.exe dist/Melee-Windows-x86_64.zip \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Latest modded build" --notes "Built by run $GITHUB_RUN_ID"
