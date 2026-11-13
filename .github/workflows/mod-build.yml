@@ -1,0 +1,50 @@
+name: Modded Windows build (secret characters)
+
+# Builds melee-pc for Windows x86-64 with the secret-characters mod applied
+# (Master Hand, Crazy Hand, Giga Bowser, the Wireframes and Sandbag on the
+# VS character select screen). The patch was written against upstream
+# commit 0fb0af3, so it is applied there.
+on:
+  push:
+    paths:
+      - '.github/workflows/mod-build.yml'
+      - '.github/workflows/secret-characters.patch'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x86_64 (modded)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply the mod
+        run: |
+          cp .github/workflows/secret-characters.patch "$RUNNER_TEMP/mod.patch"
+          git checkout --detach 0fb0af3304d3469308b5574369a6ec86f145632f
+          git apply --whitespace=nowarn "$RUNNER_TEMP/mod.patch"
+          git status --short
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build cmake zip cabextract curl mingw-w64
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+
+      - name: Build and package
+        env:
+          TARGET_ARCH: x86_64
+        run: tools/package_windows.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Melee-Windows-x86_64-modded
+          path: dist/Melee-Windows-x86_64.zip
+          if-no-files-found: error
